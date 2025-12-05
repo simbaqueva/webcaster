@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproductor con Chromecast</title>
+    <title>Reproductor Terabox con Chromecast</title>
     <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
     <style>
         * {
@@ -52,6 +52,38 @@
             padding: 30px;
         }
 
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .input-section {
             margin-bottom: 25px;
         }
@@ -62,16 +94,22 @@
             margin-bottom: 15px;
         }
 
-        input[type="text"] {
+        input[type="text"], textarea {
             flex: 1;
             padding: 12px 15px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
             font-size: 14px;
             transition: all 0.3s;
+            font-family: inherit;
         }
 
-        input[type="text"]:focus {
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        input[type="text"]:focus, textarea:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -96,6 +134,12 @@
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .btn-secondary {
             background: #f0f0f0;
             color: #333;
@@ -111,12 +155,28 @@
             border-radius: 10px;
             overflow: hidden;
             position: relative;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-section.loading::after {
+            content: 'Cargando video...';
+            color: white;
+            font-size: 18px;
         }
 
         video {
             width: 100%;
             display: block;
             max-height: 500px;
+        }
+
+        iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
         }
 
         .controls {
@@ -189,54 +249,158 @@
             color: #c62828;
         }
 
-        .examples {
+        .status.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .info-box {
             margin-top: 20px;
             padding: 15px;
             background: #f8f9fa;
             border-radius: 10px;
+            border-left: 4px solid #667eea;
         }
 
-        .examples h3 {
+        .info-box h3 {
             font-size: 16px;
             margin-bottom: 10px;
             color: #333;
         }
 
-        .examples p {
+        .info-box p, .info-box li {
             font-size: 13px;
             color: #666;
             line-height: 1.6;
             margin-bottom: 8px;
         }
 
-        .examples code {
+        .info-box code {
             background: #fff;
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 12px;
+            color: #d63384;
+        }
+
+        .info-box ol {
+            margin-left: 20px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎬 Reproductor con Chromecast</h1>
-            <p>Reproduce videos y transmite a tu dispositivo Chromecast</p>
+            <h1>🎬 Reproductor Terabox + Chromecast</h1>
+            <p>Extrae y reproduce videos de Terabox en tu Chromecast</p>
         </div>
 
         <div class="content">
-            <div class="input-section">
-                <div class="input-group">
-                    <input type="text" id="videoUrl" placeholder="Pega aquí la URL del video (MP4, MKV, etc.)">
-                    <button class="btn-primary" onclick="loadVideo()">Cargar Video</button>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('terabox')">📦 Terabox</button>
+                <button class="tab" onclick="switchTab('direct')">🔗 URL Directa</button>
+                <button class="tab" onclick="switchTab('iframe')">🖼️ iFrame</button>
+            </div>
+
+            <!-- Tab Terabox -->
+            <div id="terabox-tab" class="tab-content active">
+                <div class="input-section">
+                    <div class="input-group">
+                        <input type="text" id="teraboxUrl" placeholder="https://terabox.com/s/...">
+                        <button class="btn-primary" onclick="extractTerabox()" id="extractBtn">
+                            Extraer Video
+                        </button>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="videoTitle1" placeholder="Título del video (opcional)">
+                    </div>
                 </div>
-                <div class="input-group">
-                    <input type="text" id="videoTitle" placeholder="Título del video (opcional)">
+
+                <div class="info-box">
+                    <h3>⚠️ Limitaciones de Terabox:</h3>
+                    <p>Terabox protege sus videos con:</p>
+                    <ol>
+                        <li>Autenticación por cookies y tokens</li>
+                        <li>URLs dinámicas que expiran</li>
+                        <li>Headers específicos requeridos</li>
+                        <li>Protección CORS</li>
+                    </ol>
+                    <p><strong>Alternativas que funcionan mejor:</strong></p>
+                    <ol>
+                        <li>Usa la pestaña "iFrame" con la URL de Terabox</li>
+                        <li>O descarga el video y súbelo a Google Drive, Dropbox, etc.</li>
+                        <li>Usa el método manual en la pestaña "URL Directa"</li>
+                    </ol>
                 </div>
             </div>
 
-            <div class="video-section">
-                <video id="videoPlayer" controls></video>
+            <!-- Tab URL Directa -->
+            <div id="direct-tab" class="tab-content">
+                <div class="input-section">
+                    <div class="input-group">
+                        <input type="text" id="directUrl" placeholder="https://ejemplo.com/video.mp4">
+                        <button class="btn-primary" onclick="loadDirectVideo()">Cargar Video</button>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="videoTitle2" placeholder="Título del video (opcional)">
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <h3>🔧 Cómo obtener la URL directa de Terabox:</h3>
+                    <ol>
+                        <li>Abre el video de Terabox en tu navegador</li>
+                        <li>Presiona <code>F12</code> para abrir DevTools</li>
+                        <li>Ve a la pestaña <code>Network</code> o <code>Red</code></li>
+                        <li>Filtra por <code>.m3u8</code> o <code>.mp4</code></li>
+                        <li>Reproduce el video y busca la URL del stream</li>
+                        <li>Copia la URL completa y pégala aquí</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Tab iFrame -->
+            <div id="iframe-tab" class="tab-content">
+                <div class="input-section">
+                    <div class="input-group">
+                        <input type="text" id="iframeUrl" placeholder="URL de Terabox o cualquier reproductor embebible">
+                        <button class="btn-primary" onclick="loadIframe()">Cargar en iFrame</button>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <h3>💡 Modo iFrame:</h3>
+                    <p>Este método carga la página de Terabox directamente en un iframe. Limitaciones:</p>
+                    <ol>
+                        <li>No podrás transmitir a Chromecast directamente</li>
+                        <li>Algunos sitios bloquean el uso de iframes</li>
+                        <li>Útil para visualizar el reproductor original de Terabox</li>
+                    </ol>
+                    <p><strong>Tip:</strong> Si Terabox permite, puedes usar los controles nativos del reproductor.</p>
+                </div>
+            </div>
+
+            <div class="video-section" id="videoSection">
+                <video id="videoPlayer" controls class="hidden"></video>
+                <iframe id="iframePlayer" class="hidden"></iframe>
             </div>
 
             <div class="controls">
@@ -251,14 +415,6 @@
             </div>
 
             <div id="statusMessage"></div>
-
-            <div class="examples">
-                <h3>💡 Cómo usar:</h3>
-                <p>1. Pega la URL directa de tu video en el campo superior</p>
-                <p>2. Haz clic en "Cargar Video" para reproducir localmente</p>
-                <p>3. Usa el botón de Chromecast para transmitir a tu TV</p>
-                <p><strong>Nota:</strong> Para Terabox, necesitarás obtener la URL directa del archivo de video. Las URLs compartidas de Terabox generalmente requieren procesamiento adicional.</p>
-            </div>
         </div>
     </div>
 
@@ -296,36 +452,138 @@
                 }
             );
 
-            showStatus('Chromecast disponible. Busca dispositivos cercanos.', 'info');
+            showStatus('✅ Chromecast disponible. Busca dispositivos cercanos.', 'info');
         }
 
-        function loadVideo() {
-            const url = document.getElementById('videoUrl').value.trim();
-            const title = document.getElementById('videoTitle').value.trim() || 'Video sin título';
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        async function extractTerabox() {
+            const url = document.getElementById('teraboxUrl').value.trim();
+            const title = document.getElementById('videoTitle1').value.trim() || 'Video de Terabox';
+            const btn = document.getElementById('extractBtn');
 
             if (!url) {
-                showStatus('Por favor ingresa una URL de video', 'error');
+                showStatus('❌ Por favor ingresa una URL de Terabox', 'error');
+                return;
+            }
+
+            if (!url.includes('terabox') && !url.includes('1024tera')) {
+                showStatus('⚠️ Esta URL no parece ser de Terabox', 'warning');
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span> Extrayendo...';
+            showStatus('🔍 Intentando extraer URL del video...', 'info');
+
+            try {
+                // Intento 1: Fetch directo con CORS
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0',
+                    }
+                }).catch(e => null);
+
+                if (response && response.ok) {
+                    const html = await response.text();
+                    
+                    // Buscar patrones comunes de URLs de video
+                    const patterns = [
+                        /https?:\/\/[^"'\s]+\.mp4[^"'\s]*/gi,
+                        /https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/gi,
+                        /"url":"([^"]+)"/gi,
+                        /"videoUrl":"([^"]+)"/gi,
+                    ];
+
+                    let foundUrl = null;
+                    for (const pattern of patterns) {
+                        const matches = html.match(pattern);
+                        if (matches && matches.length > 0) {
+                            foundUrl = matches[0].replace(/["']/g, '');
+                            break;
+                        }
+                    }
+
+                    if (foundUrl) {
+                        currentMediaUrl = foundUrl;
+                        currentTitle = title;
+                        loadVideoPlayer(foundUrl);
+                        showStatus('✅ URL extraída. Intentando reproducir...', 'success');
+                    } else {
+                        throw new Error('No se encontró URL de video en la página');
+                    }
+                } else {
+                    throw new Error('No se pudo acceder a la URL (CORS bloqueado)');
+                }
+            } catch (error) {
+                showStatus('❌ No se pudo extraer automáticamente. ' + error.message + '. Usa el método manual en la pestaña "URL Directa" o "iFrame".', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Extraer Video';
+            }
+        }
+
+        function loadDirectVideo() {
+            const url = document.getElementById('directUrl').value.trim();
+            const title = document.getElementById('videoTitle2').value.trim() || 'Video';
+
+            if (!url) {
+                showStatus('❌ Por favor ingresa una URL de video', 'error');
                 return;
             }
 
             currentMediaUrl = url;
             currentTitle = title;
+            loadVideoPlayer(url);
+            showStatus('✅ Video cargado. Usa los controles para reproducir.', 'success');
+        }
 
-            player = document.getElementById('videoPlayer');
+        function loadIframe() {
+            const url = document.getElementById('iframeUrl').value.trim();
+
+            if (!url) {
+                showStatus('❌ Por favor ingresa una URL', 'error');
+                return;
+            }
+
+            const videoPlayer = document.getElementById('videoPlayer');
+            const iframePlayer = document.getElementById('iframePlayer');
+
+            videoPlayer.classList.add('hidden');
+            iframePlayer.classList.remove('hidden');
+            iframePlayer.src = url;
+
+            showStatus('✅ Contenido cargado en iFrame. Nota: No se puede transmitir a Chromecast desde un iframe.', 'warning');
+        }
+
+        function loadVideoPlayer(url) {
+            const videoPlayer = document.getElementById('videoPlayer');
+            const iframePlayer = document.getElementById('iframePlayer');
+
+            iframePlayer.classList.add('hidden');
+            videoPlayer.classList.remove('hidden');
+
+            player = videoPlayer;
             player.src = url;
             player.load();
-
-            showStatus('Video cargado. Usa los controles para reproducir.', 'success');
         }
 
         function playPause() {
             if (!player || !player.src) {
-                showStatus('Primero carga un video', 'error');
+                showStatus('❌ Primero carga un video', 'error');
                 return;
             }
 
             if (player.paused) {
-                player.play();
+                player.play().catch(e => {
+                    showStatus('❌ Error al reproducir: ' + e.message, 'error');
+                });
             } else {
                 player.pause();
             }
@@ -345,7 +603,7 @@
                 context.endCurrentSession(true);
             } else {
                 if (!currentMediaUrl) {
-                    showStatus('Primero carga un video antes de transmitir', 'error');
+                    showStatus('❌ Primero carga un video antes de transmitir', 'error');
                     return;
                 }
                 context.requestSession().then(
@@ -353,7 +611,7 @@
                         loadMediaOnCast();
                     },
                     (error) => {
-                        showStatus('Error al conectar con Chromecast: ' + error, 'error');
+                        showStatus('❌ Error al conectar con Chromecast: ' + error, 'error');
                     }
                 );
             }
@@ -364,7 +622,7 @@
             castSession = context.getCurrentSession();
 
             if (!castSession) {
-                showStatus('No hay sesión de Chromecast activa', 'error');
+                showStatus('❌ No hay sesión de Chromecast activa', 'error');
                 return;
             }
 
@@ -376,27 +634,27 @@
 
             castSession.loadMedia(request).then(
                 () => {
-                    showStatus('Transmitiendo a Chromecast: ' + currentTitle, 'success');
+                    showStatus('✅ Transmitiendo a Chromecast: ' + currentTitle, 'success');
                     if (player) {
                         player.pause();
                     }
                 },
                 (error) => {
-                    showStatus('Error al cargar el medio: ' + error, 'error');
+                    showStatus('❌ Error al cargar el medio: ' + error, 'error');
                 }
             );
         }
 
         function onSessionStarted() {
             document.getElementById('castButton').classList.add('casting');
-            document.getElementById('castStatus').textContent = 'Conectado';
-            showStatus('Conectado a Chromecast', 'success');
+            document.getElementById('castStatus').textContent = '📡 Conectado';
+            showStatus('✅ Conectado a Chromecast', 'success');
         }
 
         function onSessionEnded() {
             document.getElementById('castButton').classList.remove('casting');
             document.getElementById('castStatus').textContent = '';
-            showStatus('Desconectado de Chromecast', 'info');
+            showStatus('ℹ️ Desconectado de Chromecast', 'info');
         }
 
         function showStatus(message, type) {
